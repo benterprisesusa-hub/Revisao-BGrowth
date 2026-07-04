@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net default-deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-+]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    match /projects/{projectId} {
+      allow read: if true;
+      allow create, update: if isValidId(projectId) && isValidProject(incoming());
+      allow delete: if isValidId(projectId);
+    }
+
+    match /screens/{screenId} {
+      allow read: if true;
+      allow create, update: if isValidId(screenId) && isValidScreen(incoming());
+      allow delete: if isValidId(screenId);
+    }
+
+    match /comments/{commentId} {
+      allow read: if true;
+      allow create, update: if isValidId(commentId) && isValidComment(incoming());
+      allow delete: if isValidId(commentId);
+    }
+
+    match /history/{historyId} {
+      allow read: if true;
+      allow create: if isValidId(historyId) && isValidHistory(incoming());
+      allow update, delete: if false;
+    }
+
+    // Validation helpers
+    function isValidProject(data) {
+      return data.keys().hasAll(['id', 'name', 'module', 'description', 'version', 'createdDate', 'updatedDate', 'status'])
+        && data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 256
+        && data.module is string && data.module.size() <= 256
+        && data.description is string && data.description.size() <= 2048
+        && data.version is string && data.version.size() <= 64
+        && data.createdDate is string && data.createdDate.size() <= 64
+        && data.updatedDate is string && data.updatedDate.size() <= 64
+        && data.status is string && data.status.size() <= 64;
+    }
+
+    function isValidScreen(data) {
+      return data.keys().hasAll(['id', 'projectId', 'title', 'description', 'version', 'screenshot', 'reviewStatus', 'checklist'])
+        && data.id is string && data.id.size() <= 128
+        && data.projectId is string && data.projectId.size() <= 128
+        && data.title is string && data.title.size() <= 256
+        && data.description is string && data.description.size() <= 2048
+        && data.version is string && data.version.size() <= 64
+        && data.screenshot is string && data.screenshot.size() <= 1000000
+        && data.reviewStatus is string && data.reviewStatus.size() <= 64
+        && data.checklist is list && data.checklist.size() <= 100;
+    }
+
+    function isValidComment(data) {
+      return data.keys().hasAll(['id', 'screenId', 'title', 'description', 'category', 'priority', 'status', 'created', 'updated', 'assignedTo', 'resolved', 'pinNumber', 'pinX', 'pinY', 'shapes', 'replies', 'attachments'])
+        && data.id is string && data.id.size() <= 128
+        && data.screenId is string && data.screenId.size() <= 128
+        && data.title is string && data.title.size() <= 256
+        && data.description is string && data.description.size() <= 2048
+        && data.category is string && data.category.size() <= 64
+        && data.priority is string && data.priority.size() <= 64
+        && data.status is string && data.status.size() <= 64
+        && data.created is string && data.created.size() <= 64
+        && data.updated is string && data.updated.size() <= 64
+        && data.assignedTo is string && data.assignedTo.size() <= 256
+        && data.resolved is bool
+        && data.pinNumber is number
+        && data.pinX is number
+        && data.pinY is number
+        && data.shapes is list && data.shapes.size() <= 50
+        && data.replies is list && data.replies.size() <= 200
+        && data.attachments is list && data.attachments.size() <= 50;
+    }
+
+    function isValidHistory(data) {
+      return data.keys().hasAll(['id', 'projectId', 'action', 'details', 'timestamp'])
+        && data.id is string && data.id.size() <= 128
+        && data.projectId is string && data.projectId.size() <= 128
+        && data.action is string && data.action.size() <= 256
+        && data.details is string && data.details.size() <= 2048
+        && data.timestamp is string && data.timestamp.size() <= 64;
+    }
+  }
+}

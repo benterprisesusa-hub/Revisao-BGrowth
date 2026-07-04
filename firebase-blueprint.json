@@ -1,0 +1,93 @@
+{
+  "entities": {
+    "Project": {
+      "title": "Project",
+      "description": "BGrowth project definition containing review screens and status.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "module": { "type": "string" },
+        "description": { "type": "string" },
+        "version": { "type": "string" },
+        "createdDate": { "type": "string" },
+        "updatedDate": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "name", "module", "description", "version", "createdDate", "updatedDate", "status"]
+    },
+    "Screen": {
+      "title": "Screen",
+      "description": "An annotated mockup screen uploaded for design review.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "projectId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "version": { "type": "string" },
+        "screenshot": { "type": "string" },
+        "reviewStatus": { "type": "string" },
+        "checklist": { "type": "array" }
+      },
+      "required": ["id", "projectId", "title", "description", "version", "screenshot", "reviewStatus", "checklist"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "A comment pin with annotations placed on a mockup screen.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "screenId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "priority": { "type": "string" },
+        "status": { "type": "string" },
+        "created": { "type": "string" },
+        "updated": { "type": "string" },
+        "assignedTo": { "type": "string" },
+        "resolved": { "type": "boolean" },
+        "pinNumber": { "type": "number" },
+        "pinX": { "type": "number" },
+        "pinY": { "type": "number" },
+        "shapes": { "type": "array" },
+        "replies": { "type": "array" },
+        "attachments": { "type": "array" }
+      },
+      "required": ["id", "screenId", "title", "description", "category", "priority", "status", "created", "updated", "assignedTo", "resolved", "pinNumber", "pinX", "pinY", "shapes", "replies", "attachments"]
+    },
+    "HistoryEntry": {
+      "title": "HistoryEntry",
+      "description": "Audit trail log of actions taken within a project.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "projectId": { "type": "string" },
+        "screenId": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "projectId", "action", "details", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "Collection of projects defined in the workspace."
+    },
+    "/screens/{screenId}": {
+      "schema": "Screen",
+      "description": "Mockup screens mapped to their parent projects."
+    },
+    "/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "Pin annotations and feedback lines mapped to screens."
+    },
+    "/history/{historyId}": {
+      "schema": "HistoryEntry",
+      "description": "Project activity logs and audit trails."
+    }
+  }
+}

@@ -1,0 +1,314 @@
+import React, { useState } from 'react';
+import { ReviewStoreProvider, useReviewStore } from './data/store';
+import { AppHeader } from './components/AppHeader';
+import { Dashboard } from './components/Dashboard';
+import { AnnotationCanvas } from './components/AnnotationCanvas';
+import { AnnotationToolbar } from './components/AnnotationToolbar';
+import { ComparisonViewer } from './components/ComparisonViewer';
+import { CommentPanel } from './components/CommentPanel';
+import { ChecklistPanel } from './components/ChecklistPanel';
+import { HistoryPanel } from './components/HistoryPanel';
+
+// Modals
+import { NewProjectDialog } from './components/NewProjectDialog';
+import { NewScreenDialog } from './components/NewScreenDialog';
+import { ExportDialog } from './components/ExportDialog';
+import { PromptGenerator } from './components/PromptGenerator';
+import { SettingsDialog } from './components/SettingsDialog';
+
+import { 
+  ArrowLeft, MessageSquare, CheckSquare, Clock, 
+  Columns, Monitor, ChevronRight, CheckCircle2, Plus
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+
+const AppContent: React.FC = () => {
+  const {
+    screens,
+    activeScreenId,
+    setActiveScreenId,
+    activeProjectId,
+    viewMode,
+    setViewMode,
+    comments,
+  } = useReviewStore();
+
+  // Dialog / Modal Visibility States
+  const [showNewProject, setShowNewProject] = useState(false);
+  const [showNewScreen, setShowNewScreen] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [showPrompt, setShowPrompt] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+
+  // Layout View States
+  const [rightTab, setRightTab] = useState<'comments' | 'checklist' | 'history'>('comments');
+  const [isComparisonActive, setIsComparisonActive] = useState(false);
+
+  // Figma comment positioning coordinate hook state
+  const [newPinData, setNewPinData] = useState<{ x: number; y: number; shapes: any[] } | null>(null);
+  const [focusedCommentId, setFocusedCommentId] = useState<string | null>(null);
+
+  const activeScreen = screens.find((s) => s.id === activeScreenId);
+  const projectScreens = screens.filter((s) => s.projectId === activeProjectId);
+
+  // Calculate project completion progress dynamically
+  const projectScreensIds = projectScreens.map((s) => s.id);
+  const projectComments = comments.filter((c) => projectScreensIds.includes(c.screenId));
+  const resolvedIssues = projectComments.filter((c) => c.resolved).length;
+  const totalIssues = projectComments.length;
+
+  let totalChecklistItems = 0;
+  let checkedChecklistItems = 0;
+  projectScreens.forEach((scr) => {
+    scr.checklist.forEach((item) => {
+      totalChecklistItems++;
+      if (item.checked) checkedChecklistItems++;
+    });
+  });
+
+  const checklistProgress = totalChecklistItems > 0 
+    ? Math.round((checkedChecklistItems / totalChecklistItems) * 100) 
+    : 0;
+
+  const issueProgress = totalIssues > 0 
+    ? Math.round((resolvedIssues / totalIssues) * 100) 
+    : 100;
+
+  const projectCompletion = projectScreens.length > 0 
+    ? Math.round((issueProgress + checklistProgress) / 2)
+    : 0;
+
+  const handleSelectScreen = (screenId: string) => {
+    setActiveScreenId(screenId);
+    setViewMode('studio');
+  };
+
+  return (
+    <div className="h-screen w-screen flex flex-col overflow-hidden bg-[#F8FAFC] font-sans text-slate-800">
+      {/* Upper header controls */}
+      <AppHeader
+        onOpenNewProject={() => setShowNewProject(true)}
+        onOpenNewScreen={() => setShowNewScreen(true)}
+        onOpenExport={() => setShowExport(true)}
+        onOpenPrompt={() => setShowPrompt(true)}
+        onOpenSettings={() => setShowSettings(true)}
+      />
+
+      {/* Primary content area */}
+      <div className="flex-1 flex overflow-hidden min-h-0 relative">
+        <AnimatePresence mode="wait">
+          {viewMode === 'dashboard' ? (
+            // Landing Dashboard grid
+            <motion.div
+              key="dashboard"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex-1 flex overflow-hidden min-h-0"
+            >
+              <Dashboard
+                onSelectScreen={handleSelectScreen}
+                onOpenNewScreen={() => setShowNewScreen(true)}
+                onOpenNewProject={() => setShowNewProject(true)}
+              />
+            </motion.div>
+          ) : (
+            // Studio Workspace View
+            <motion.div
+              key="studio"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex-1 flex overflow-hidden min-h-0"
+            >
+              {/* Left Bar: Switch Screen selector */}
+              <div className="w-60 bg-white border-r border-slate-200 flex flex-col shrink-0 select-none">
+                <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                  <button
+                    id="btn-back-dashboard"
+                    onClick={() => setViewMode('dashboard')}
+                    className="flex items-center space-x-1.5 text-xs font-bold text-slate-400 hover:text-[#1061EC] transition"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Voltar ao Painel</span>
+                  </button>
+                </div>
+
+                {/* Sub title details list */}
+                <div className="p-4 border-b border-slate-100 shrink-0 flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Telas ({projectScreens.length})</span>
+                  <button onClick={() => setShowNewScreen(true)} className="text-[#1061EC] hover:bg-blue-50 p-1 rounded">
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                  {projectScreens.map((s) => {
+                    const unresolvedCount = comments.filter((c) => c.screenId === s.id && !c.resolved).length;
+                    const isActive = s.id === activeScreenId;
+                    return (
+                      <button
+                        key={s.id}
+                        id={`sidebar-screen-select-${s.id}`}
+                        onClick={() => {
+                          setActiveScreenId(s.id);
+                          setNewPinData(null);
+                          setFocusedCommentId(null);
+                        }}
+                        className={`w-full text-left p-2.5 rounded-lg text-xs flex items-center gap-3 cursor-pointer transition ${
+                          isActive
+                            ? 'bg-blue-50 border border-blue-100 text-blue-900 font-bold'
+                            : 'text-slate-600 hover:bg-slate-50 border border-transparent'
+                        }`}
+                      >
+                        <div className={`w-12 h-10 rounded border flex items-center justify-center overflow-hidden flex-shrink-0 ${
+                          isActive ? 'bg-slate-200 border-blue-200' : 'bg-slate-100 border-slate-200'
+                        }`}>
+                          {s.screenshot === 'dashboard' ? (
+                            <div className="w-full h-full bg-slate-200 flex items-center justify-center text-[8px] text-slate-500 font-black">DB</div>
+                          ) : s.screenshot === 'login' ? (
+                            <div className="w-full h-full bg-slate-200 flex items-center justify-center text-[8px] text-slate-500 font-black">LN</div>
+                          ) : s.screenshot === 'crm' ? (
+                            <div className="w-full h-full bg-slate-200 flex items-center justify-center text-[8px] text-slate-500 font-black">CRM</div>
+                          ) : (
+                            <img src={s.screenshot} className="w-full h-full object-cover" referrerPolicy="no-referrer" alt="" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className={`text-xs ${isActive ? 'font-bold text-blue-900' : 'font-semibold text-slate-800'}`}>
+                            {s.title}
+                          </div>
+                          <div className={`text-[10px] ${isActive ? 'text-blue-600' : 'text-slate-500'} mt-0.5`}>
+                            {s.version} • {unresolvedCount} Problemas
+                          </div>
+                        </div>
+                        {unresolvedCount > 0 && (
+                          <div className="ml-auto bg-red-100 text-red-600 text-[8px] px-1 rounded font-bold">
+                            !
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Bottom comparative switch triggers */}
+                <div className="p-4 border-t border-slate-100 shrink-0 bg-slate-50/50 space-y-2">
+                  <button
+                    id="btn-toggle-comparison"
+                    onClick={() => setIsComparisonActive(!isComparisonActive)}
+                    className={`w-full py-2 px-3 border rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition ${
+                      isComparisonActive 
+                        ? 'bg-blue-600 border-blue-600 text-white shadow' 
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Columns className="w-3.5 h-3.5" />
+                    <span>{isComparisonActive ? 'Fechar Comparador' : 'Comparar Versões'}</span>
+                  </button>
+                </div>
+
+                {/* Project progress bottom block */}
+                <div className="p-4 border-t border-slate-100 bg-slate-50">
+                  <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-2">
+                    <span>PROGRESSO DO PROJETO</span>
+                    <span>{projectCompletion}%</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                    <div className="bg-[#1061EC] h-full transition-all duration-300" style={{ width: `${projectCompletion}%` }}></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Center workspace: canvas, comparisons */}
+              <div className="flex-1 flex flex-col overflow-hidden relative">
+                {isComparisonActive ? (
+                  <ComparisonViewer onBackToSingle={() => setIsComparisonActive(false)} />
+                ) : (
+                  <>
+                    <AnnotationCanvas
+                      onAddCommentPrompt={(x, y, shapes) => setNewPinData({ x, y, shapes })}
+                      activeCommentId={focusedCommentId}
+                      onSelectComment={(id) => {
+                        setFocusedCommentId(id);
+                        setRightTab('comments');
+                      }}
+                    />
+                    <AnnotationToolbar />
+                  </>
+                )}
+              </div>
+
+              {/* Right column: Action comments tabs */}
+              <div className="w-80 bg-white border-l border-slate-200 flex flex-col shrink-0 select-none">
+                {/* Right Tab controls selector */}
+                <div className="h-14 border-b border-slate-150 flex items-center px-2 shrink-0">
+                  {[
+                    { id: 'comments', label: 'Comentários', icon: <MessageSquare className="w-3.5 h-3.5" /> },
+                    { id: 'checklist', label: 'Checklist QA', icon: <CheckSquare className="w-3.5 h-3.5" /> },
+                    { id: 'history', label: 'Histórico', icon: <Clock className="w-3.5 h-3.5" /> },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      id={`btn-tab-right-${tab.id}`}
+                      onClick={() => setRightTab(tab.id as any)}
+                      className={`flex-1 py-2 rounded-lg text-[11px] font-bold flex flex-col items-center justify-center space-y-1 transition ${
+                        rightTab === tab.id
+                          ? 'bg-slate-100 text-slate-800'
+                          : 'text-slate-400 hover:text-slate-700'
+                      }`}
+                    >
+                      {tab.icon}
+                      <span>{tab.label}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Tab content wrapper renderers */}
+                <div className="flex-1 overflow-hidden min-h-0 relative">
+                  {rightTab === 'comments' && (
+                    <CommentPanel
+                      onFocusPin={(id) => setFocusedCommentId(id)}
+                      focusedCommentId={focusedCommentId}
+                      newPinData={newPinData}
+                      onClearNewPin={() => setNewPinData(null)}
+                    />
+                  )}
+                  {rightTab === 'checklist' && <ChecklistPanel />}
+                  {rightTab === 'history' && <HistoryPanel />}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Overlay Modals Dialog triggers */}
+      <AnimatePresence>
+        {showNewProject && (
+          <NewProjectDialog onClose={() => setShowNewProject(false)} />
+        )}
+        {showNewScreen && (
+          <NewScreenDialog onClose={() => setShowNewScreen(false)} />
+        )}
+        {showExport && (
+          <ExportDialog onClose={() => setShowExport(false)} />
+        )}
+        {showPrompt && (
+          <PromptGenerator onClose={() => setShowPrompt(false)} />
+        )}
+        {showSettings && (
+          <SettingsDialog onClose={() => setShowSettings(false)} />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+export default function App() {
+  return (
+    <ReviewStoreProvider>
+      <AppContent />
+    </ReviewStoreProvider>
+  );
+}

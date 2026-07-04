@@ -1,0 +1,6 @@
+{
+  "name": "BGrowth Review Studio",
+  "description": "A professional visual software review platform to compare versions, review interfaces, annotate screenshots, organize feedback, and generate AI implementation prompts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
